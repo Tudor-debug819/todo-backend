@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Task } from '../tasks/tasks.entity';
@@ -24,14 +24,28 @@ export class TasksService {
     }
 
     // GET ONE
-    findOne(id: string) {
-        return this.repo.findOneBy({ id });
+    async findOne(id: string): Promise<Task> {
+        const task = await this.repo.findOneBy({ id });
+        if (!task) throw new NotFoundException('Task not found');
+        return task;
     }
 
     // UPDATE
     async update(id: string, dto: UpdateTaskDto) {
-        await this.repo.update(id, dto);
-        return this.findOne(id);
+        const task = await this.findOne(id);
+
+        // dacă se trimite completed
+        if (typeof dto.completed === 'boolean' && dto.completed !== task.completed) {
+            task.completed = dto.completed;
+            task.completedAt = dto.completed ? new Date() : null;
+        }
+
+        // update restul câmpurilor (dacă vin)
+        if (typeof dto.title === 'string') task.title = dto.title;
+        if (typeof dto.description === 'string' || dto.description === null) task.description = dto.description ?? undefined;
+        if (dto.dueDate !== undefined) task.dueDate = dto.dueDate ?? undefined;
+
+        return this.repo.save(task);
     }
 
     // DELETE
