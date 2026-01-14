@@ -3,13 +3,15 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
   app.enableCors({
-    origin: ['http://localhost:4200', 'https://localhost:4200', 'https://angular-project-nine-eta.vercel.app'],
-    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+    origin: process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+      : ['http://localhost:4200'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   });
 
-  const port = Number(process.env.PORT) || 3000;
-  await app.listen(port);
+  await app.listen(process.env.PORT || 3000);
 }
 bootstrap();
