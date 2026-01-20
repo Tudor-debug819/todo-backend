@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Task } from '../tasks/tasks.entity';
@@ -14,10 +14,16 @@ export class TasksService {
 
     // CREATE
     create(dto: CreateTaskDto) {
-        const task = this.repo.create(dto);
+        this.assertDueDateNotPast(dto.dueDate);
+
+        const task = this.repo.create({
+            title: dto.title,
+            description: dto.description,
+            dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+        });
+
         return this.repo.save(task);
     }
-
     // GET ALL
     findAll() {
         return this.repo.find();
@@ -43,7 +49,10 @@ export class TasksService {
         // update restul câmpurilor (dacă vin)
         if (typeof dto.title === 'string') task.title = dto.title;
         if (typeof dto.description === 'string' || dto.description === null) task.description = dto.description ?? undefined;
-        if (dto.dueDate !== undefined) task.dueDate = dto.dueDate ?? undefined;
+        if (dto.dueDate !== undefined) {
+            this.assertDueDateNotPast(dto.dueDate);
+            task.dueDate = dto.dueDate ? new Date(dto.dueDate) : undefined;
+        }
 
         return this.repo.save(task);
     }
@@ -66,5 +75,25 @@ export class TasksService {
                 t.dueDate && new Date(t.dueDate).toDateString() === today
             ).length,
         };
+    }
+
+    private assertDueDateNotPast(dueDateIso?: string) {
+        if (!dueDateIso) return;
+
+        const due = new Date(dueDateIso);
+        if (isNaN(due.getTime())) {
+            throw new BadRequestException('Invalid dueDate');
+        }
+
+        // comparăm date-only (fără ore) ca în frontend
+        const dueDay = new Date(due);
+        dueDay.setHours(0, 0, 0, 0);
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (dueDay < today) {
+            throw new BadRequestException('dueDate cannot be in the past');
+        }
     }
 }
